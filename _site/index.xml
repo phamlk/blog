@@ -10,7 +10,118 @@
 <atom:link href="https://users.ox.ac.uk/~ndcn0890/index.xml" rel="self" type="application/rss+xml"/>
 <description>(mouse) brain imaging and statistics</description>
 <generator>quarto-1.6.42</generator>
-<lastBuildDate>Wed, 23 Jul 2025 23:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sat, 26 Jul 2025 23:00:00 GMT</lastBuildDate>
+<item>
+  <title>Mounting cluster filesystems on your mac</title>
+  <dc:creator>Jason Lerch</dc:creator>
+  <link>https://users.ox.ac.uk/~ndcn0890/posts/sshfs/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<p>Another bit on setting up a new mac; this one isn’t in any way particular to our toolkit, but is useful enough that I figured it worth documenting. It involves mounting remote filesystems, in my case on the compute clusters used for processing, on a mac via ssh. There are two usecases I have where I find this really helpful:</p>
+<ol type="1">
+<li>Quick visualization of images without having to open an OnDemand desktop/VNC session.</li>
+<li>Editing of code without dealing with remote vnc lag.</li>
+</ol>
+<p>The key tool is <a href="https://github.com/libfuse/sshfs">sshfs</a> via the <a href="https://github.com/libfuse/libfuse">fuse</a> filesystem. There have been various attempts to get this working on OSX, but with Apple becoming increasingly restrictive about loading kernel drivers these have been a tad unreliable. But a recent reimplementation purely in userspace relying on NFS in the background has worked a treat.</p>
+<section id="installation" class="level3">
+<h3 class="anchored" data-anchor-id="installation">Installation</h3>
+<p>The easiest way to install sshfs, as well as many other geeky tools, is via <a href="https://brew.sh">brew</a>. If you haven’t installed brew yet, do that first. Follow instructions at that link above or do this:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">/bin/bash</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-c</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$(</span><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-fsSL</span> https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">)</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span></code></pre></div>
+</div>
+<p>(or check whether <code>brew</code> exists in your path on the terminal first)</p>
+<p>Once brew is set up, install sshfs and fuse</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">brew</span> install macos-fuse-t/homebrew-cask/fuse-t</span>
+<span id="cb2-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">brew</span> install macos-fuse-t/homebrew-cask/fuse-t-sshfs</span></code></pre></div>
+</div>
+</section>
+<section id="mounting-filesystems" class="level3">
+<h3 class="anchored" data-anchor-id="mounting-filesystems">Mounting filesystems</h3>
+<p>Now that sshfs is installed you can use it to mount any filesystem from any cluster that you can ssh to. Here I’ll use Oxford’s BMRC cluster as an example. You’ll have to mount it to an existing, empty directory, so create one first:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># go to home directory</span></span>
+<span id="cb3-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">cd</span></span>
+<span id="cb3-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># create a new directory - only needs to be done once, of course</span></span>
+<span id="cb3-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mkdir</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-p</span> well/lerch</span>
+<span id="cb3-5"></span>
+<span id="cb3-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># and now mount. Of course replace username and machine name etc. as needed</span></span>
+<span id="cb3-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">sshfs</span> yrf023@cluster4.bmrc.ox.ac.uk:/well/lerch well/lerch</span></code></pre></div>
+</div>
+<p>It’ll then prompt for password (and in the case of BMRC the second token). Just like sshing to the system you have to be on Oxford’s network, so connect to VPN.</p>
+<p>At this point you can treat that directory the way you would any other directory on your filesystem. Use it in the terminal or the Finder, etc.</p>
+</section>
+<section id="mirroring-remote-and-local-directory-names" class="level3">
+<h3 class="anchored" data-anchor-id="mirroring-remote-and-local-directory-names">Mirroring remote and local directory names</h3>
+<p>There’s one more optional step. Right now the remote filesystem lives, in the example above, in /Users/jason/well/lerch. This is just fine for most purposes, but there are times when it’s nice to have the same paths as exist remotely so that symlinks or bits of code work unchanged. Unfortunately modern OSX doesn’t allow you to create root level directories as it considers it a read-only filesystem. But there is a workaround, documented <a href="https://apple.stackexchange.com/questions/388236/unable-to-create-folder-in-root-of-macintosh-hd">here</a>. Here’s what I did in the above example; note that it requires you to have root (sudo) access to your mac.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># open an editor to create a new file</span></span>
+<span id="cb4-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sudo</span> nano /etc/synthetic.conf </span></code></pre></div>
+</div>
+<p>Then add the following line in that file<br>
+<br>
+<code>well   /Users/jason/well</code></p>
+<p>Not that the separation between <code>well</code> and <code>/Users/jason/well</code> is a tab. And obviously update this to your own directory - I doubt it’ll be <code>/Users/jason</code> …</p>
+<p>Then either reboot your mac or type the following</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">/System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-t</span></span></code></pre></div>
+</div>
+<p>And there it is. Now you can access the remote filesystem at <code>/well/lerch</code> on your mac.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>mac</category>
+  <guid>https://users.ox.ac.uk/~ndcn0890/posts/sshfs/</guid>
+  <pubDate>Sat, 26 Jul 2025 23:00:00 GMT</pubDate>
+</item>
 <item>
   <title>MINC tools on a new mac</title>
   <dc:creator>Jason Lerch</dc:creator>
@@ -200,6 +311,7 @@ font-style: inherit;">"Mouse-Imaging-Centre/MRIcrotome"</span>)</span></code></p
 
  ]]></description>
   <category>RMINC</category>
+  <category>mac</category>
   <guid>https://users.ox.ac.uk/~ndcn0890/posts/minc-tools-new-mac/</guid>
   <pubDate>Wed, 23 Jul 2025 23:00:00 GMT</pubDate>
 </item>

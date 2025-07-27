@@ -3,7 +3,7 @@ title: "MINC tools on a new mac"
 description: "How to install MINC, RMINC, etc. on a new mac"
 author: "Jason Lerch"
 date: "2025-07-24"
-categories: [RMINC]
+categories: [RMINC,mac]
 format:
   html
 ---

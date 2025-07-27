@@ -1,0 +1,90 @@
+---
+title: "Mounting cluster filesystems on your mac"
+description: "Using SSHFS to get read/write access to cluster filesystems"
+author: "Jason Lerch"
+date: "2025-07-27"
+engine: knitr
+categories: [mac]
+format:
+  html
+---
+
+Another bit on setting up a new mac; this one isn't in any way particular to our toolkit, but is useful enough that I figured it worth documenting. It involves mounting remote filesystems, in my case on the compute clusters used for processing, on a mac via ssh. There are two usecases I have where I find this really helpful:
+
+1.  Quick visualization of images without having to open an OnDemand desktop/VNC session.
+2.  Editing of code without dealing with remote vnc lag.
+
+The key tool is [sshfs](https://github.com/libfuse/sshfs) via the [fuse](https://github.com/libfuse/libfuse) filesystem. There have been various attempts to get this working on OSX, but with Apple becoming increasingly restrictive about loading kernel drivers these have been a tad unreliable. But a recent reimplementation purely in userspace relying on NFS in the background has worked a treat.
+
+### Installation
+
+The easiest way to install sshfs, as well as many other geeky tools, is via [brew](https://brew.sh). If you haven't installed brew yet, do that first. Follow instructions at that link above or do this:
+
+```{bash}
+#| eval: false
+
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+```
+
+(or check whether `brew` exists in your path on the terminal first)
+
+Once brew is set up, install sshfs and fuse
+
+```{bash}
+#| eval: false
+
+brew install macos-fuse-t/homebrew-cask/fuse-t
+brew install macos-fuse-t/homebrew-cask/fuse-t-sshfs
+
+```
+
+### Mounting filesystems
+
+Now that sshfs is installed you can use it to mount any filesystem from any cluster that you can ssh to. Here I'll use Oxford's BMRC cluster as an example. You'll have to mount it to an existing, empty directory, so create one first:
+
+```{bash}
+#| eval: false
+
+# go to home directory
+cd
+# create a new directory - only needs to be done once, of course
+mkdir -p well/lerch
+
+# and now mount. Of course replace username and machine name etc. as needed
+sshfs yrf023@cluster4.bmrc.ox.ac.uk:/well/lerch well/lerch
+
+```
+
+It'll then prompt for password (and in the case of BMRC the second token). Just like sshing to the system you have to be on Oxford's network, so connect to VPN.
+
+At this point you can treat that directory the way you would any other directory on your filesystem. Use it in the terminal or the Finder, etc.
+
+### Mirroring remote and local directory names
+
+There's one more optional step. Right now the remote filesystem lives, in the example above, in /Users/jason/well/lerch. This is just fine for most purposes, but there are times when it's nice to have the same paths as exist remotely so that symlinks or bits of code work unchanged. Unfortunately modern OSX doesn't allow you to create root level directories as it considers it a read-only filesystem. But there is a workaround, documented [here](https://apple.stackexchange.com/questions/388236/unable-to-create-folder-in-root-of-macintosh-hd). Here's what I did in the above example; note that it requires you to have root (sudo) access to your mac.
+
+```{bash}
+#| eval: false
+
+# open an editor to create a new file
+sudo nano /etc/synthetic.conf 
+
+```
+
+Then add the following line in that file\
+\
+`well	/Users/jason/well`
+
+Not that the separation between `well` and `/Users/jason/well` is a tab. And obviously update this to your own directory - I doubt it'll be `/Users/jason` ...
+
+Then either reboot your mac or type the following
+
+```{bash}
+#| eval: false
+
+/System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t
+
+```
+
+And there it is. Now you can access the remote filesystem at `/well/lerch` on your mac.
