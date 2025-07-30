@@ -2,58 +2,66 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/about.html</loc>
-    <lastmod>2025-07-25T09:10:07.234Z</lastmod>
+    <lastmod>2025-07-30T03:17:44.959Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/developmental-data/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.268Z</lastmod>
+    <lastmod>2025-07-30T03:17:42.936Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/welcome/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.463Z</lastmod>
+    <lastmod>2025-07-30T03:17:35.622Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/developmental-data-part2/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.253Z</lastmod>
+    <lastmod>2025-07-30T03:17:34.738Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/atlas-colours-in-plots/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.235Z</lastmod>
+    <lastmod>2025-07-30T03:17:17.819Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/pydpiper-init-model/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.449Z</lastmod>
+    <lastmod>2025-07-30T03:17:14.371Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/copy-select-files-pydpiper/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.253Z</lastmod>
+    <lastmod>2025-07-30T03:17:12.220Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/better-MRIcrotome-outlines/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.235Z</lastmod>
+    <lastmod>2025-07-30T03:17:13.738Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/minc-on-bmrc/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.448Z</lastmod>
+    <lastmod>2025-07-30T03:17:15.171Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/MBM-command-illustrated/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.235Z</lastmod>
+    <lastmod>2025-07-30T03:17:18.450Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/sshfs/index.html</loc>
-    <lastmod>2025-07-27T10:43:09.721Z</lastmod>
+    <lastmod>2025-07-30T03:17:35.250Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/sct-power-basic/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.458Z</lastmod>
+    <lastmod>2025-07-30T03:17:36.519Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/posts/minc-tools-new-mac/index.html</loc>
-    <lastmod>2025-07-27T10:09:05.688Z</lastmod>
+    <lastmod>2025-07-30T03:17:41.458Z</lastmod>
   </url>
   <url>
     <loc>https://users.ox.ac.uk/~ndcn0890/index.html</loc>
-    <lastmod>2025-07-25T09:10:07.234Z</lastmod>
+    <lastmod>2025-07-30T03:18:15.015Z</lastmod>
+  </url>
+  <url>
+    <loc>https://users.ox.ac.uk/~ndcn0890/posts/pyro5-command-illustrated/index.html</loc>
+    <lastmod>2025-07-30T03:19:03.919Z</lastmod>
+  </url>
+  <url>
+    <loc>https://users.ox.ac.uk/~ndcn0890/posts/RMINC-tips-for-many-files/index.html</loc>
+    <lastmod>2025-07-30T03:18:34.318Z</lastmod>
   </url>
 </urlset>

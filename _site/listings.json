@@ -2,6 +2,8 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/RMINC-tips-for-many-files/index.html",
+      "/posts/pyro5-command-illustrated/index.html",
       "/posts/sshfs/index.html",
       "/posts/minc-tools-new-mac/index.html",
       "/posts/pydpiper-init-model/index.html",

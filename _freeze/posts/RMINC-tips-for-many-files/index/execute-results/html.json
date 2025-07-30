@@ -1,0 +1,14 @@
+{
+  "hash": "bd7e5312ac1826a07dd67cd78e7630f8",
+  "result": {
+    "markdown": "---\ntitle: \"RMINC tips when working with many files\"\nauthor: \"Linh Pham\"\ndescription: \"Tips for using RMINC when you have many images to parse through.\"\ndate: \"2025/07/30\"\ndate-modified: \"2025-07-30\"\ncategories: [RMINC, BMRC, longitudinal, high-throughput]\ndraft: false\nengine: knitr\nnumber-sections: false\n---\n\n\nSometimes, you might be in the fortunate position of having thousands of images to process and use for your analyses. This post contains tips and tricks for working with large number of files in RMINC when that happens. It will continue to be modified with more tips as I encounter more more issues.\n\n# Modify your .renv file \n\nWhen you have many images, `anatGetAll` can take forever to read in the results of the registration pipeline. To fix this, simply create a `.renv` file in a directory of your choice.\n\n\n::: {.cell}\n\n```{.bash .cell-code}\nnano my-env.renv\n```\n:::\n\n\nIn the `.renv` file, insert this line\n\n\n::: {.cell}\n\n```{.bash .cell-code}\nulimit -Sn unlimited\n```\n:::\n\n\nThis increases the soft stack limit and number of files that can be opened/processed at the same time within the RStudio environment.\n\nOn BMRC, `.renv` files can be loaded alongside RStudio in OnDemand sessions in the extra modules script. Under the \"Extra modules script\" section, list the absolute path to the `.renv` file that you've made. This will get loaded into your RStudio session as it's starting up.\n\nIn full, my `.renv` file currently contains the following to also load modules and tools needed for RMINC. It's modified from `Rstudio.env` found in `/well/lerch/shared/tools/`.\n\n\n::: {.cell}\n\n```{.bash .cell-code}\nulimit -Sn unlimited\nmodule load poppler/22.12.0-GCC-11.3.0\nmodule load quarto/1.5.57-x64\nmodule use --append /well/lerch/shared/tools/modules/\nmodule load RMINC/1.5.3-GCCcore-11.3.0\n```\n:::\n\n\nWhen you use RStudio, run `anatGetAll` as you normally would and your pipeline volume files should be quickly loaded. `anatGetAll` supposedly does have some options to load files quickly via `slurm`, but on some preliminary tries, it didn't seem to make a difference. Setting the `ulimit` was the way to go.\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
