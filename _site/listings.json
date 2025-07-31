@@ -2,6 +2,9 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/RMINC-tips-for-many-files/index.html",
+      "/posts/rminc-visualizations-explained/index.html",
+      "/posts/pyro5-command-illustrated/index.html",
       "/posts/sshfs/index.html",
       "/posts/minc-tools-new-mac/index.html",
       "/posts/pydpiper-init-model/index.html",
@@ -12,8 +15,8 @@
       "/posts/better-MRIcrotome-outlines/index.html",
       "/posts/sct-power-basic/index.html",
       "/posts/MBM-command-illustrated/index.html",
-      "/posts/minc-on-bmrc/index.html",
-      "/posts/welcome/index.html"
+      "/posts/welcome/index.html",
+      "/posts/minc-on-bmrc/index.html"
     ]
   }
 ]

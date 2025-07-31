@@ -1,0 +1,264 @@
+---
+title: "Under the hood: visualizations in RMINC"
+description: "How RMINC projects and visualizes results using a sample cross-sectional comparison."
+author: "Linh Pham and Jason Lerch"
+date: "2025/07/30"
+date-modified: "2025/07/30"
+categories: [RMINC]
+draft: false
+engine: knitr
+number-selections: false
+---
+
+RMINC visualization tools are versatile, but how the results are visualized are not super obvious. Here, I'm demonstrating a little bit of what's happening under the hood using Four Core Genotype rat data that Myrto Lavda had gathered. 
+
+Myrto had surgically induced strokes on some of these animals to understand how sex hormones and chromosomes impact stroke outcomes in the brain. We will be comparing the difference in volume between rats of different genotypes and stages of the stroke experiment. 
+
+```{r}
+#| echo: false 
+knitr::opts_chunk$set(echo = TRUE)
+options(bitmapType='cairo')
+```
+
+# Set up 
+
+Reading in necessary packages 
+```{r}
+packages <- c("tidyverse", "RMINC", "MRIcrotome", "broom", "forcats", "gridExtra", "lspline", "emmeans", "png", "Cairo", "ggplot2", "rstatix")
+
+invisible(sapply(packages, function(x) library(x, character.only = TRUE)))
+```
+
+# Reading in the data
+
+The output of a PydPiper pipeline includes different types of Jacobian determinants for each image. The full Jacobian (log_full_det) is used when one's interested in volumetric effects and not accounting for total brain volume (TBV). Nonlinear Jacobian (log_nlin_det) is used when TBV should be accounted.
+
+PydPiper saves these determinants after different levels of blurring have been applied to them at each voxel. A FWHM blur of 0.2 is usually used when the analyses are at the voxel level. FWHM of 0 (no blurring) is used when analyses are done at the regional level (since noise from voxel-wise determinants can be reduced when the voxels determinants are averaged/combined to make a regional volume).
+
+The code below reads in a csv, produced from PydPiper pipeline, that indicates where the determinant files for each image/animal are located. Files with FWHM 0.2 are chosen because analyses will be done at the voxel level. Some text manipulations are done to animal ID and time point for ease of analyses later on. A new variable, 'stage', is made to determine if the animal was scanned at baseline, after acute stroke, or doing recovery using their file names.
+
+```{r}
+pipeout <- read_csv("/well/lerch/users/dqp841/FCG_Rat_Stroke/pipelines/analysis.csv") %>% 
+  dplyr::filter(fwhm==0.2)%>%
+  mutate(Animal.ID = basename(log_nlin_det), # the following lines are modifying animal IDs and category to make them suitable for subsequent analyses 
+         Animal.ID = str_replace(Animal.ID, "RNC4", "RNEC4"),
+         Animal.ID = str_replace(Animal.ID, "RNEC4_1_Base", "RNEC4_1c_Base"),
+         Animal.ID = str_replace(Animal.ID, "RNEC1_1b", "RNEC3_1b"),
+         Animal.ID = gsub('.+Stroke_(.+_.+)_[PBF].+', '\\1',Animal.ID),
+         timepoint = str_split(Animal.ID, "_") %>% map_chr(.,~ifelse(length(.x)>2, .x[3], "PS3")),
+         timepoint = ifelse(timepoint == "a", "Baseline", timepoint),
+         timepoint = ifelse(timepoint == "b", "Baseline", timepoint),
+         Animal.ID = str_split(Animal.ID, "_") %>% map_chr(.,~paste(.x[1],.x[2],sep=".")),
+         stage = case_when(str_detect(log_nlin_det, "Baseline") ~ "baseline",
+      str_detect(log_nlin_det, "baseline") ~ "baseline",
+      str_detect(log_nlin_det, "PS37") ~ "recovery",
+      str_detect(log_nlin_det, "Recovery") ~ "recovery",
+      str_detect(log_nlin_det, "PS30") ~ "recovery",
+      str_detect(log_nlin_det, "PS3\\d") ~ "recovery",
+      str_detect(log_nlin_det, "PS3") ~ "acute",
+      str_detect(log_nlin_det, "RNEC3_1a_FCGStro") ~ "acute",
+      str_detect(log_nlin_det, "RNEC1_1b") ~ "acute",
+      TRUE ~ "undetected"
+    ))
+
+head(pipeout)
+```
+
+Reading in animal meta information.
+
+```{r}
+# reading in the data and keeping only IDs that are unique (removing duplicates essentially)
+ratinfo <- read_csv("/well/lerch/users/dqp841/FCG_Rat_Stroke/analyses/Master_Data_File - info-all_clean.csv") %>% distinct(`Animal ID`, .keep_all = TRUE) %>% rename(Animal.ID = `Animal ID`)
+
+# now we need to join the pipeout data frame with rat info data frame by animal ID. first, we need to see if the ID matches up across pipeout and rat info. 
+head(pipeout$Animal.ID)
+head(ratinfo$Animal.ID)
+
+# looks the same. joining them together. setting the stage variable as a factor variable with hierarchy baseline, acute, recovery. adding full paths to log_nlin_det, log_full_det, and label_file. 
+gf <- left_join(pipeout, ratinfo, by="Animal.ID") %>%
+  mutate(stage = factor(stage, levels=c("baseline", "acute", "recovery")),
+         genotype = factor(Genotype, levels=c("XX", "XY", "XYSry", "XXSry")),
+         log_nlin_det = paste0("/well/lerch/users/dqp841/FCG_Rat_Stroke/pipelines/", log_nlin_det),
+         log_full_det = paste0("/well/lerch/users/dqp841/FCG_Rat_Stroke/pipelines/", log_full_det),
+         label_file=paste0("/well/lerch/users/dqp841/FCG_Rat_Stroke/pipelines/", label_file))
+
+#  getting a summary output of the genotype and stages
+gf %>% group_by(genotype, stage) %>% summarise(count = n()) %>% pivot_wider(names_from = stage, values_from = count, id_cols = "genotype") %>% mutate(Sum = rowSums(across(where(is.numeric))))
+```
+
+Reading in the consensus/averaged segmented image generated after nonlinear transformation round 3 (nlin-3). This will be used downstream as a mask to indicate which voxels in the images can be used to make linear models.
+
+```{r}
+mask <- "/well/lerch/users/dqp841/FCG_Rat_Stroke/pipelines/FCGRat-t2-2024-10-03_nlin/FCGRat-t2-2024-10-03-nlin-3/FCGRat-t2-2024-10-03-nlin-3_voted.mnc"
+```
+
+## Analyses
+
+In the following examples, different types of models are fitted to answer some very specific questions. 
+
+### Simple case: vs_genotype model
+
+Here, the [mincLm function](https://rdrr.io/github/Mouse-Imaging-Centre/RMINC/man/mincLm.html) from the RMINC package is used. This function allows you to fit a linear model across all voxels in the data.
+
+The model is addressing this question: which voxels show statistically significant volumetric differences between the genotypes at the baseline time point?
+
+Notice the mask imported earlier is used here to help mincLm determine which voxels in the images that can be included for linear modeling.
+
+```{r}
+# note that this is using the log_full_determinants. total brain volume are not accounted for in this model. to do that, you'd use relative determinants. 
+vs_genotype <- mincLm(log_full_det ~ genotype, gf %>% dplyr::filter(stage == "baseline"), mask=mask)
+```
+
+I want to explore the outputs of vs_genotype and build up my understanding of what's available for visualization purposes from there.
+
+```{r}
+# what's in vs_genotype 
+colnames(vs_genotype)
+head(vs_genotype)
+dim(vs_genotype)
+```
+
+So the results from mincLm seems to include the beta coefficients (differences) in log_full_determinants between XX and the other genotypes at baseline (XX is not present, so it's serving as the reference variable for all comparisons), and t-statistics associated with the difference between XX and the other genotypes.
+
+If you want to see whether XY is different from the other genotypes, for example, you would need to refactor the data. Sample code below (this code is not run).
+
+```{r, eval = FALSE}
+
+gf %>% genotype = factor(Genotype, levels=c("XY", "XX", "XYSry", "XXSry"))
+```
+
+There are 746,045 voxels where these statistics are available. That's too many comparisons, and we run the risk of having voxels that are not actually different between the groups deemed significant (false positives). Multiple comparison adjustments need to be done.
+
+This is where [mincFDR](https://rdrr.io/github/Mouse-Imaging-Centre/RMINC/man/mincFDR.html) comes in. mincFDR takes a mincLm object as an input, and then (I think) it: 1) converts the t-values in mincLm to p-values and 2) applies the `p.adjust` function to all voxels, taking into account how many voxels there are in total.
+
+Let's apply mincFDR to our simple model and see its outputs. I'm calling it vs_genotype_qvals because after FDR adjustments, p-values are called q-values.
+
+```{r}
+vs_genotype_qvals <- mincFDR(vs_genotype)
+
+head(vs_genotype_qvals)
+dim(vs_genotype_qvals)
+```
+
+So you get a matrix with the same number of voxels (rows) as your input model and some columns labeled `qvalue-tvalue-genotype`. I suspect that these are the going to be the adjusted p-values (or q-values) you'll want to visualize on your atlases!
+
+Let's just double check that's the case. I'm checking the range of these q-value columns. If they're all between 0 and 1, that would mean they are in fact adjusted p-values.
+
+```{r}
+# apply the function (range) to all columns in vs_genotype_qvals 
+sapply(1:ncol(vs_genotype_qvals), function(x) range(vs_genotype_qvals[,x]))
+```
+
+Nice! They're all 0 - 1. That means they're all adjusted p-values, and there is a way to visualize these on your atlases.
+
+## Visualizations
+
+To do our visualizations, we need a couple more things. First, a template image so the statistics visualizations can be laid on top of it. Here we're using the average nlin-3 image from the pipeline.
+
+```{r}
+nlin <- mincArray(mincGetVolume("/well/lerch/users/dqp841/FCG_Rat_Stroke/pipelines/FCGRat-t2-2024-10-03_nlin/FCGRat-t2-2024-10-03-nlin-3.mnc"))
+
+dim(nlin)
+```
+
+Then, the atlas labels of the data.
+
+```{r}
+# using the 'mask' file again because it's actually the labelled atlas. 
+labelVol <- mincArray(mincGetVolume(mask))
+
+dim(labelVol)
+```
+
+Notice when I print the dimensions of nlin and labelVol, they are exactly the same. That's because nlin is the nlin-3 image, and labelVol is the labels of the nlin-3 image (nlin-3_voted).
+
+Both files have 85 slices in the x-axis, 131 slices in the y-axis, and 67 slices in the z-axis.
+
+Let's look at an example slice from these data matrices to see what information they're storing.
+
+```{r}
+# pull a sample of the matrix representing voxels in slice 30 of z-axis in nlin and labelVol
+nlin[, ,30 ][35,]
+labelVol[, ,30][35,]
+```
+
+I've pulled out 129 values each from `nlin` and `labelVol`. Each of these values are information contained within a subset of voxels at slice 30 in the z-axis.
+
+In `nlin`, the voxels are decimal numbers representing image intensity.
+
+In `labelVol`, the voxels are whole numbers representing an atlas label (i.e. 1 is Hippocampus. I'm just making up the numbers and their associations. Actual associations are likely different).
+
+With that in mind, I'm gonna annotate the following visualization:
+
+```{r}
+# start a sliceSeries, with 1 row and 5 columns. use slices from the z-axis (default), and plot 5 slices (5 columns) from slices 30 through 90. 
+sliceSeries(nrow=1, ncol=5, begin=30, end=90) %>% 
+
+# overlay the anatomy image. in our case, is the nlin-3 image. plot voxels that are between 700 to 1400 in their image intensities. 
+  anatomy(nlin, low=700, high=1400) %>%
+  
+# overlay the statistics. see explanation below the figure that will be generated
+  overlay(-log10(mincArray(vs_genotype_qvals, "qvalue-tvalue-genotypeXXSry")) * (labelVol>0.5) * sign(mincArray(vs_genotype, "tvalue-genotypeXXSry")), low=0.1, high=2, symmetric=T) %>% 
+
+# add a title
+  addtitle("XXSry abs") %>% 
+
+# add a legend 
+  legend("-log10 q-value") %>% 
+
+# draw the figure! 
+  draw()
+```
+
+## The statistics overlay
+
+As a reminder, this was our statistics overlay code for the visualization.
+
+`overlay(-log10(mincArray(vs_genotype_qvals, "qvalue-tvalue-genotypeXXSry")) * (labelVol>0.5) * sign(mincArray(vs_genotype, "tvalue-genotypeXXSry")), low=0.1, high=2, symmetric=T)`
+
+To explain how this works , let's break down how it's calculated first. I'm still pulling a sample from slice 30 of z-dimension to be consistent.
+
+```{r}
+# step 1: calculate -log10 of q-values at every voxels. log10 is multipled by negative 1 because log10 gives negative values for anything less than 1. Negative q-values don't make sense. Applying log10 to the q-value is just scaling them up to make visualization easier (seeing the difference between 0 and 2 is easier than 0 and 1) 
+log10_q <- -log10(mincArray(vs_genotype_qvals, "qvalue-tvalue-genotypeXXSry"))[, ,30][35,]
+
+log10_q 
+
+# step 2: identify if a voxel is actually inside a region of interest/inside the brain using the following code. in R, TRUE is coded as 1 and FALSE is coded as 0. so imagine the output is a matrix of TRUE/FALSE is also read as a 1/0 matrix. if a voxel is inside the brain/associated with a brain region, it would have an atlas label > 0. hence why this works. 
+label_in_brain <- labelVol[, ,30][35,]>0.5
+label_in_brain 
+
+# step 3: identify the signs associated with t-values in the voxels. negative means it's lesser volume in the XXSry genotype compared to XX. positive means it's greater in volume for XXSry genotype compared to XX. 
+tvals_sign <- sign(mincArray(vs_genotype, "tvalue-genotypeXXSry")[, ,30][35,])
+tvals_sign
+
+# notice these vectors have the same dimension. we're referring to the same voxels across all of these vectors.
+length(log10_q)
+length(label_in_brain)
+length(tvals_sign)
+
+# step 4: multiply all three vectors together. these are the values plotted on your visualization. 
+sample_qvals_on_map <- log10_q * label_in_brain * tvals_sign
+sample_qvals_on_map
+```
+
+Notice that the range of these sample q-values
+
+```{r}
+range(sample_qvals_on_map)
+```
+
+In this case, they're from 0 to 0.91. Notice in the code, we had this bit \``` low=0.1, high=2, symmetric=T)` `` . Here, any voxel where the -log10 q-value is below 0.1 is not plotted, and anything beyond 2 is not plotted (assuming the smallest raw q-value is 0.01). If I increase the low threshold to 0.7
+
+```{r}
+sliceSeries(nrow=1, ncol=5, begin=30, end=90) %>%
+  anatomy(nlin, low=700, high=1400) %>%
+  overlay(-log10(mincArray(vs_genotype_qvals, "qvalue-tvalue-genotypeXXSry")) * (labelVol>0.5) * sign(mincArray(vs_genotype, "tvalue-genotypeXXSry")), low=0.7, high=2, symmetric=T) %>% legend("-log10 q-value") %>%
+  addtitle("XXSry abs") %>% draw()
+```
+
+Why do we want to have all of these modifications to the original q-values? If you play around with the code and take out `(labelVol>0.5) * sign(mincArray(vs_genotype, "tvalue-genotypeXXSry")`, your display will look exactly the same given the slices you've chosen.
+
+But, if you choose different slices (say instead of between 30 - 90, you pick somewhere closer to beginning or final slices i.e. 110 - 131), where the data is noisier, I would suspect you'll get more inaccurate display of your stats. Just play around and see if this is true!
+
+I hope this will help you have more flexibility in using RMINC to visualize your results. 

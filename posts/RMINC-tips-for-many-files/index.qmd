@@ -1,0 +1,46 @@
+---
+title: "RMINC tips when working with many files"
+author: "Linh Pham"
+description: "Tips for using RMINC when you have many images to parse through."
+date: "2025/07/30"
+date-modified: "2025-07-30"
+categories: [RMINC, BMRC, longitudinal, high-throughput]
+draft: false
+engine: knitr
+number-sections: false
+---
+
+Sometimes, you might be in the fortunate position of having thousands of images to process and use for your analyses. This post contains tips and tricks for working with large number of files in RMINC when that happens. It will continue to be modified with more tips as I encounter more more issues.
+
+# Modify your .renv file 
+
+When you have many images, `anatGetAll` can take forever to read in the results of the registration pipeline. To fix this, simply create a `.renv` file in a directory of your choice.
+
+```{bash}
+#| eval: false
+nano my-env.renv
+```
+
+In the `.renv` file, insert this line
+
+```{bash}
+#| eval: false
+ulimit -Sn unlimited
+```
+
+This increases the soft stack limit and number of files that can be opened/processed at the same time within the RStudio environment.
+
+On BMRC, `.renv` files can be loaded alongside RStudio in OnDemand sessions in the extra modules script. Under the "Extra modules script" section, list the absolute path to the `.renv` file that you've made. This will get loaded into your RStudio session as it's starting up.
+
+In full, my `.renv` file currently contains the following to also load modules and tools needed for RMINC. It's modified from `Rstudio.env` found in `/well/lerch/shared/tools/`.
+
+```{bash}
+#| eval: false
+ulimit -Sn unlimited
+module load poppler/22.12.0-GCC-11.3.0
+module load quarto/1.5.57-x64
+module use --append /well/lerch/shared/tools/modules/
+module load RMINC/1.5.3-GCCcore-11.3.0
+```
+
+When you use RStudio, run `anatGetAll` as you normally would and your pipeline volume files should be quickly loaded. `anatGetAll` supposedly does have some options to load files quickly via `slurm`, but on some preliminary tries, it didn't seem to make a difference. Setting the `ulimit` was the way to go.

@@ -6,11 +6,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Jason Lerch">
-<meta name="dcterms.date" content="2023-09-16">
-<meta name="description" content="How to make better brain outlines for MRIcrotome">
+<meta name="author" content="Linh Pham">
+<meta name="dcterms.date" content="2025-07-30">
+<meta name="description" content="Tips for using RMINC when you have many images to parse through.">
 
-<title>Better MRIcrotome brain outlines – digressions on (mouse) brain imaging</title>
+<title>RMINC tips when working with many files – digressions on (mouse) brain imaging</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -179,16 +179,17 @@ cookieconsent.run({
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">Better MRIcrotome brain outlines</h1>
+      <h1 class="title">RMINC tips when working with many files</h1>
                   <div>
         <div class="description">
-          How to make better brain outlines for MRIcrotome
+          Tips for using RMINC when you have many images to parse through.
         </div>
       </div>
                           <div class="quarto-categories">
-                <div class="quarto-category">R</div>
-                <div class="quarto-category">MRIcrotome</div>
                 <div class="quarto-category">RMINC</div>
+                <div class="quarto-category">BMRC</div>
+                <div class="quarto-category">longitudinal</div>
+                <div class="quarto-category">high-throughput</div>
               </div>
                   </div>
   </div>
@@ -199,17 +200,23 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Author</div>
       <div class="quarto-title-meta-contents">
-               <p>Jason Lerch </p>
+               <p>Linh Pham </p>
             </div>
     </div>
       
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">September 16, 2023</p>
+        <p class="date">July 30, 2025</p>
       </div>
     </div>
     
+      <div>
+      <div class="quarto-title-meta-heading">Modified</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date-modified">July 30, 2025</p>
+      </div>
+    </div>
       
     </div>
     
@@ -225,187 +232,28 @@ cookieconsent.run({
 
 
 
-<p>Brain outlines are used routinely in MRIcrotome sliceSeries for showing slice locations, plus they can have value in their own right for replacing the full grey-scale background with an outline. By default the outlines take a bit of trial and error to find the right isointensity lines; in some cases no truly good outlines can be generated. Here I will show an alternate way of generating an outline based on having a hierarchical segmentation present.</p>
-<section id="setting-up" class="level2" data-number="1">
-<h2 data-number="1" class="anchored" data-anchor-id="setting-up"><span class="header-section-number">1</span> Setting up</h2>
-<p>First we’ll load an existing dataset and generate the hierarchical segmentation representations. For those at Oxford using the BMRC cluster you can follow along, for anyone else you’ll have to substitute your own dataset.</p>
-<p>First step, read the information about the scans.</p>
+<p>Sometimes, you might be in the fortunate position of having thousands of images to process and use for your analyses. This post contains tips and tricks for working with large number of files in RMINC when that happens. It will continue to be modified with more tips as I encounter more more issues.</p>
+<section id="modify-your-.renv-file" class="level1">
+<h1>Modify your .renv file</h1>
+<p>When you have many images, <code>anatGetAll</code> can take forever to read in the results of the registration pipeline. To fix this, simply create a <code>.renv</code> file in a directory of your choice.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>gfw2 <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">"exercise-gfw2.csv"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nano</span> my-env.renv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>So at this point we have the gf variable containing info about all our files, and gfw2 subsetting them just to the two week timepoint (this is from mice being given access to an exercise wheel).</p>
-<p>Next we’ll load the final non-linear average, the segmented final nonlinear average, and build all the volumes.</p>
+<p>In the <code>.renv</code> file, insert this line</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RMINC)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># read the anatomy and labels </span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>nlin <span class="ot">&lt;-</span> <span class="fu">mincArray</span>(<span class="fu">mincGetVolume</span>(<span class="st">"/well/lerch/users/yrf023/plasticity/plasticity-2023-03-10_nlin/plasticity-2023-03-10-nlin-3.mnc"</span>))</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>labels <span class="ot">&lt;-</span> <span class="fu">mincArray</span>(<span class="fu">mincGetVolume</span>(<span class="st">"/well/lerch/users/yrf023/plasticity/plasticity-2023-03-10_nlin/plasticity-2023-03-10-nlin-3/plasticity-2023-03-10-nlin-3_voted.mnc"</span>))</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># get all the volumes</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>allvolsw2 <span class="ot">&lt;-</span> <span class="fu">anatGetAll</span>(gfw2<span class="sc">$</span>labels, <span class="at">defs=</span><span class="st">"/well/lerch/shared/tools/atlases/Dorr_2008_Steadman_2013_Ullmann_2013/mappings/Dorr_2008_Steadman_2013_Ullmann_2013_mapping_of_labels.csv"</span>, <span class="at">method=</span><span class="st">"labels"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">ulimit</span> <span class="at">-Sn</span> unlimited</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>And now we put the labelled atlas into it’s hierarchy.</p>
-<div class="cell" data-hash="index_cache/html/unnamed-chunk-3_2de3e6f5f15475f960e0aaebc88ead79">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># there's a warning that spews everywhere that needs to be fixed in RMINC, but causes no harm.</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># so for now I'll suppress these warnings</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressWarnings</span>({</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>hdefs <span class="ot">&lt;-</span> <span class="fu">makeMICeDefsHierachical</span>(<span class="st">"/well/lerch/shared/tools/atlases/Dorr_2008_Steadman_2013_Ullmann_2013/mappings/Dorr_2008_Steadman_2013_Ullmann_2013_mapping_of_labels.csv"</span>, <span class="st">"/well/lerch/shared/tools/atlases/Allen_Brain/Allen_hierarchy_definitions.json"</span>)</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>hvolsw2 <span class="ot">&lt;-</span> <span class="fu">addVolumesToHierarchy</span>(hdefs, allvolsw2)</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-</section>
-<section id="a-basic-example" class="level2" data-number="2">
-<h2 data-number="2" class="anchored" data-anchor-id="a-basic-example"><span class="header-section-number">2</span> A basic example</h2>
-<p>Let’s do a basic example of running a simple linear model, showing it on a brain alongside a slice indicator and legend.</p>
+<p>This increases the soft stack limit and number of files that can be opened/processed at the same time within the RStudio environment.</p>
+<p>On BMRC, <code>.renv</code> files can be loaded alongside RStudio in OnDemand sessions in the extra modules script. Under the “Extra modules script” section, list the absolute path to the <code>.renv</code> file that you’ve made. This will get loaded into your RStudio session as it’s starting up.</p>
+<p>In full, my <code>.renv</code> file currently contains the following to also load modules and tools needed for RMINC. It’s modified from <code>Rstudio.env</code> found in <code>/well/lerch/shared/tools/</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(MRIcrotome)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>
-Attaching package: 'MRIcrotome'</code></pre>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="bu">ulimit</span> <span class="at">-Sn</span> unlimited</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">module</span> load poppler/22.12.0-GCC-11.3.0</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">module</span> load quarto/1.5.57-x64</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">module</span> use <span class="at">--append</span> /well/lerch/shared/tools/modules/</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">module</span> load RMINC/1.5.3-GCCcore-11.3.0</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="cell-output cell-output-stderr">
-<pre><code>The following object is masked from 'package:graphics':
-
-    legend</code></pre>
-</div>
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(grid)</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># a simple linear model against group</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>vs <span class="ot">&lt;-</span> <span class="fu">mincLm</span>(reljacs <span class="sc">~</span> group, gfw2, <span class="at">mask =</span> <span class="st">"/well/lerch/users/yrf023/plasticity/plasticity-2023-03-10_nlin/plasticity-2023-03-10-nlin-3_mask.mnc"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Method: lm
-Number of volumes: 18
-Volume sizes: 161 319 210
-N: 18 P: 2
-In slice 
- 0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32  33  34  35  36  37  38  39  40  41  42  43  44  45  46  47  48  49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64  65  66  67  68  69  70  71  72  73  74  75  76  77  78  79  80  81  82  83  84  85  86  87  88  89  90  91  92  93  94  95  96  97  98  99  100  101  102  103  104  105  106  107  108  109  110  111  112  113  114  115  116  117  118  119  120  121  122  123  124  125  126  127  128  129  130  131  132  133  134  135  136  137  138  139  140  141  142  143  144  145  146  147  148  149  150  151  152  153  154  155  156  157  158  159  160 
-Done</code></pre>
-</div>
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># show it as a 3 by 3 slice series</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sliceSeries</span>(<span class="at">nrow=</span><span class="dv">3</span>, <span class="at">ncol=</span><span class="dv">3</span>, <span class="at">begin=</span><span class="dv">60</span>, <span class="at">end=</span><span class="dv">250</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anatomy</span>(nlin, <span class="at">low=</span><span class="dv">700</span>, <span class="at">high=</span><span class="dv">1400</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">overlay</span>(<span class="fu">mincArray</span>(vs, <span class="st">"tvalue-grouprunning"</span>), <span class="at">low=</span><span class="dv">2</span>, <span class="at">high=</span><span class="dv">6</span>, <span class="at">symmetric=</span>T) <span class="sc">%&gt;%</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">legend</span>(<span class="st">"t-statistics"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">contourSliceIndicator</span>(nlin, <span class="at">levels=</span><span class="fu">c</span>(<span class="dv">700</span>, <span class="dv">1400</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">draw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="index_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>So that looks roughly right - the slice indicator, at the top right, gives a pretty good idea of where the brain is located. But it’s not great; let’s try a few different contours to see what might look better.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sliceSeries</span>(<span class="at">nrow=</span><span class="dv">3</span>, <span class="at">ncol=</span><span class="dv">3</span>, <span class="at">begin=</span><span class="dv">60</span>, <span class="at">end=</span><span class="dv">250</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anatomy</span>(nlin, <span class="at">low=</span><span class="dv">700</span>, <span class="at">high=</span><span class="dv">1400</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">contours</span>(nlin, <span class="at">levels=</span><span class="fu">c</span>(<span class="dv">700</span>, <span class="dv">900</span>, <span class="dv">1100</span>, <span class="dv">1400</span>), <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"red"</span>, <span class="st">"green"</span>, <span class="st">"blue"</span>, <span class="st">"purple"</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">draw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="index_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Lots of fiddling could be done getting the exact right intensity contours, but it’ll be a challenge to get it just right.</p>
-</section>
-<section id="contours-based-on-segmentations" class="level2" data-number="3">
-<h2 data-number="3" class="anchored" data-anchor-id="contours-based-on-segmentations"><span class="header-section-number">3</span> Contours based on segmentations</h2>
-<p>So here’s the trick - the perfect outline is inherently in our segmentation. First, let’s view the segmentation</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sliceSeries</span>(<span class="at">nrow=</span><span class="dv">5</span>, <span class="at">ncol=</span><span class="dv">1</span>, <span class="at">begin=</span><span class="dv">60</span>, <span class="at">end=</span><span class="dv">250</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anatomy</span>(nlin, <span class="at">low=</span><span class="dv">700</span>, <span class="at">high=</span><span class="dv">1400</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addtitle</span>(<span class="st">"anatomy"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sliceSeries</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anatomy</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">overlay</span>(<span class="fu">hanatToVolume</span>(hvolsw2, labels, <span class="st">"color_hex_triplet"</span>), <span class="at">low=</span><span class="dv">0</span>, <span class="at">high=</span><span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addtitle</span>(<span class="st">"segmentation"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">draw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="index_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Now the key part here is that the labels are in a hierarchy. A clean outline could thus be taken if we use just the first parts of that hierarchy:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(data.tree)</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co"># create a copy of the hierarchical tree</span></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>hdefs2 <span class="ot">&lt;-</span> <span class="fu">Clone</span>(hvolsw2)</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># and prune it to just the first four levels </span></span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>hdefs2<span class="sc">$</span><span class="fu">Prune</span>(<span class="cf">function</span>(x) x<span class="sc">$</span>level<span class="sc">&lt;</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning: 'hdefs2$Prune' is deprecated.
-Use 'Prune(node, ...)' instead.
-See help("Deprecated")</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 495</code></pre>
-</div>
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># print it to see what it looks like</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(hdefs2, <span class="at">limit=</span><span class="cn">Inf</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>                                               levelName
-1  root2                                                
-2   &lt;U+00A6&gt;--Basic cell groups and regions             
-3   &lt;U+00A6&gt;   &lt;U+00A6&gt;--Cerebrum                       
-4   &lt;U+00A6&gt;   &lt;U+00A6&gt;--Brain stem                     
-5   &lt;U+00A6&gt;   &lt;U+00B0&gt;--Cerebellum                     
-6   &lt;U+00A6&gt;--fiber tracts                              
-7   &lt;U+00A6&gt;   &lt;U+00A6&gt;--cranial nerves                 
-8   &lt;U+00A6&gt;   &lt;U+00A6&gt;--medial forebrain bundle system 
-9   &lt;U+00A6&gt;   &lt;U+00A6&gt;--cerebellum related fiber tracts
-10  &lt;U+00A6&gt;   &lt;U+00A6&gt;--lateral forebrain bundle system
-11  &lt;U+00A6&gt;   &lt;U+00B0&gt;--extrapyramidal fiber systems   
-12  &lt;U+00B0&gt;--ventricular systems                       
-13      &lt;U+00A6&gt;--cerebral aqueduct                     
-14      &lt;U+00A6&gt;--fourth ventricle                      
-15      &lt;U+00A6&gt;--lateral ventricle                     
-16      &lt;U+00B0&gt;--third ventricle                       </code></pre>
-</div>
-</div>
-<p>Now create an outline based on this pruned hierarchy</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sliceSeries</span>(<span class="at">nrow=</span><span class="dv">5</span>, <span class="at">ncol=</span><span class="dv">1</span>, <span class="at">begin=</span><span class="dv">60</span>, <span class="at">end=</span><span class="dv">250</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anatomy</span>(nlin, <span class="at">low=</span><span class="dv">700</span>, <span class="at">high=</span><span class="dv">1400</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sliceSeries</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anatomy</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">overlay</span>(<span class="fu">hanatToVolume</span>(hvolsw2, labels, <span class="st">"color_hex_triplet"</span>), <span class="at">low=</span><span class="dv">0</span>, <span class="at">high=</span><span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sliceSeries</span>() <span class="sc">%&gt;%</span> <span class="fu">anatomy</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">contours</span>(<span class="fu">hanatToVolume</span>(hdefs2, labels, <span class="st">"position"</span>), <span class="at">levels=</span><span class="fu">c</span>(<span class="fl">0.5</span>, <span class="fl">1.5</span>, <span class="fl">2.5</span>, <span class="fl">3.5</span>), <span class="at">col=</span><span class="st">"red"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">draw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="index_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>And there you have an almost perfect outline of the brain. So let’s recreate that earlier figure with the cleaner outline:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sliceSeries</span>(<span class="at">nrow=</span><span class="dv">3</span>, <span class="at">ncol=</span><span class="dv">3</span>, <span class="at">begin=</span><span class="dv">60</span>, <span class="at">end=</span><span class="dv">250</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anatomy</span>(nlin, <span class="at">low=</span><span class="dv">700</span>, <span class="at">high=</span><span class="dv">1400</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">overlay</span>(<span class="fu">mincArray</span>(vs, <span class="st">"tvalue-grouprunning"</span>), <span class="at">low=</span><span class="dv">2</span>, <span class="at">high=</span><span class="dv">6</span>, <span class="at">symmetric=</span>T) <span class="sc">%&gt;%</span></span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">legend</span>(<span class="st">"t-statistics"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">contourSliceIndicator</span>(<span class="fu">hanatToVolume</span>(hdefs2, labels, <span class="st">"position"</span>), <span class="at">levels=</span><span class="fu">c</span>(<span class="fl">0.5</span>, <span class="fl">1.5</span>, <span class="fl">2.5</span>, <span class="fl">3.5</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">draw</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="index_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Voila.</p>
+<p>When you use RStudio, run <code>anatGetAll</code> as you normally would and your pipeline volume files should be quickly loaded. <code>anatGetAll</code> supposedly does have some options to load files quickly via <code>slurm</code>, but on some preliminary tries, it didn’t seem to make a difference. Setting the <code>ulimit</code> was the way to go.</p>
 
 
 </section>
